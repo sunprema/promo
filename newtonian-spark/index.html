@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Newtonian Spark — Build AI agents like software</title>
+<meta name="description" content="A visual architecture platform that turns AI agent behavior from fragile prompt strings into versioned, validated, deployable systems." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* Newtonian Spark identity — light technical-blueprint shell, IBM Plex,
+     reusing the application's own oklch palette (see assets/css/app.css). */
+  :root {
+    --paper:    oklch(0.985 0.004 245);
+    --panel:    oklch(0.99 0.003 245);
+    --ink:      oklch(0.28 0.02 255);
+    --ink-soft: oklch(0.45 0.02 255);
+    --ink-mute: oklch(0.6 0.015 250);
+    --line:     oklch(0.82 0.02 250);
+    --line-soft:oklch(0.9 0.012 250);
+    --indigo:   oklch(0.55 0.13 255);
+    --indigo-d: oklch(0.45 0.13 255);
+    --green:    oklch(0.5 0.11 155);
+    --green-bd: oklch(0.72 0.08 155);
+    --amber:    oklch(0.62 0.13 70);
+    --violet:   oklch(0.52 0.14 300);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    color: var(--ink);
+    background-color: var(--paper);
+    /* faint blueprint graph-paper grid */
+    background-image:
+      linear-gradient(oklch(0.82 0.02 250 / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.82 0.02 250 / 0.35) 1px, transparent 1px);
+    background-size: 26px 26px;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+
+  /* ── top bar (mirrors the studio bar) ── */
+  .bar {
+    height: 46px; display: flex; align-items: center; gap: 12px;
+    padding: 0 18px; background: oklch(0.97 0.004 245);
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .mark {
+    width: 18px; height: 18px; border: 1.5px solid oklch(0.3 0.02 255);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mark span { width: 7px; height: 7px; background: var(--indigo); transform: rotate(45deg); }
+  .bar .name { font: 600 13px/1 "IBM Plex Mono", monospace; }
+  .bar .chip {
+    font: 500 10px/1 "IBM Plex Mono", monospace; color: var(--green);
+    border: 1px solid var(--green-bd); padding: 3px 6px; letter-spacing: 0.05em;
+    text-transform: uppercase; border-radius: 3px;
+  }
+  .bar .spacer { flex: 1; }
+  .bar a.ghlink { font: 500 12px/1 "IBM Plex Mono", monospace; color: var(--ink-soft); text-decoration: none; }
+  .bar a.ghlink:hover { color: var(--indigo); }
+
+  /* ── hero ── */
+  .hero { padding: 78px 0 30px; text-align: center; }
+  .eyebrow {
+    font: 600 12px "IBM Plex Mono", monospace; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--indigo);
+  }
+  h1 {
+    font-size: clamp(34px, 6vw, 56px); font-weight: 700; letter-spacing: -0.025em;
+    margin: 16px 0 0; line-height: 1.05;
+  }
+  .hero .sub {
+    color: var(--ink-soft); font-size: clamp(15px, 2.4vw, 19px); line-height: 1.6;
+    max-width: 600px; margin: 18px auto 0;
+  }
+  .cta { margin-top: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+    font: 600 13px "IBM Plex Mono", monospace; letter-spacing: 0.02em;
+    padding: 11px 18px; border-radius: 7px; transition: all 0.16s ease;
+  }
+  .btn-primary { background: var(--indigo); color: oklch(0.99 0 0); border: 1px solid var(--indigo-d); }
+  .btn-primary:hover { background: var(--indigo-d); }
+  .btn-ghost { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--indigo); color: var(--indigo); }
+
+  /* ── framed product shot ── */
+  .shot {
+    margin: 40px auto 0; max-width: 1000px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+    box-shadow: 0 24px 70px oklch(0.5 0.05 255 / 0.12);
+  }
+  .shot-head {
+    display: flex; align-items: center; gap: 7px; padding: 4px 6px 10px;
+    font: 500 11px "IBM Plex Mono", monospace; color: var(--ink-mute);
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .shot img { width: 100%; display: block; border-radius: 7px; border: 1px solid var(--line-soft); }
+  .shot .cap { padding: 10px 6px 2px; font-size: 13px; color: var(--ink-mute); text-align: center; }
+
+  /* ── section ── */
+  section { padding: 64px 0; }
+  .sec-label { font: 600 12px "IBM Plex Mono", monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--indigo); }
+  .sec-h { font-size: clamp(24px, 4vw, 34px); font-weight: 700; letter-spacing: -0.02em; margin: 10px 0 8px; }
+  .sec-sub { color: var(--ink-soft); font-size: 16px; line-height: 1.6; max-width: 620px; margin: 0; }
+
+  /* ── feature cards (blueprint node cards, left accent like the canvas) ── */
+  .grid { margin-top: 34px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .node {
+    background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--indigo);
+    border-radius: 8px; padding: 18px 20px;
+  }
+  .node.green  { border-left-color: var(--green); }
+  .node.amber  { border-left-color: var(--amber); }
+  .node.violet { border-left-color: var(--violet); }
+  .node .kind {
+    font: 600 10px "IBM Plex Mono", monospace; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .node .title { font-size: 17px; font-weight: 600; margin: 7px 0 6px; letter-spacing: -0.01em; }
+  .node .body { color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
+  .node .body code {
+    font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--indigo);
+    background: oklch(0.96 0.03 255); padding: 1px 4px; border-radius: 3px;
+  }
+
+  /* ── split: contrast block ── */
+  .contrast { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; margin-top: 30px; }
+  .compare { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; }
+  .compare h4 { margin: 0 0 12px; font: 600 12px "IBM Plex Mono", monospace; letter-spacing: 0.08em; text-transform: uppercase; }
+  .compare.bad h4  { color: var(--ink-mute); }
+  .compare.good h4 { color: var(--green); }
+  .compare ul { margin: 0; padding-left: 18px; color: var(--ink-soft); font-size: 14.5px; line-height: 1.75; }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 30px 0 48px; margin-top: 30px;
+    font: 400 12px "IBM Plex Mono", monospace; color: var(--ink-mute);
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  footer a { color: var(--ink-soft); text-decoration: none; }
+  footer a:hover { color: var(--indigo); }
+
+  @media (max-width: 640px) {
+    .contrast { grid-template-columns: 1fr; }
+    .hero { padding: 54px 0 20px; }
+  }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="mark"><span></span></div>
+    <div class="name">Newtonian Spark</div>
+    <div class="chip">● blueprint</div>
+    <div class="spacer"></div>
+    <a class="ghlink" href="https://github.com/sunprema/nspark">github →</a>
+  </div>
+
+  <header class="hero wrap">
+    <div class="eyebrow">Visual architecture for AI agents</div>
+    <h1>Build AI agents<br />like software.</h1>
+    <p class="sub">
+      Most agents are long, fragile prompt strings — edit the text and hope nothing breaks.
+      Newtonian Spark treats agent behavior as architecture: modular, versioned, validated, and deployable.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/sunprema/nspark">View on GitHub</a>
+      <a class="btn btn-ghost" href="#how">See how it works</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="shot">
+      <div class="shot-head">
+        <span class="dot" style="background: var(--amber)"></span>
+        <span class="dot" style="background: var(--green)"></span>
+        <span class="dot" style="background: var(--indigo)"></span>
+        <span style="margin-left:6px">studio · agent planner</span>
+      </div>
+      <img src="studio-full.png" alt="The Newtonian Spark studio: node palette and variable explorer, graph canvas, live diagnostics and compiler" />
+      <div class="cap">Node palette + auto-discovered variables · the graph canvas · live diagnostics and the compiler.</div>
+    </div>
+  </div>
+
+  <section id="how" class="wrap">
+    <div class="sec-label">The idea</div>
+    <h2 class="sec-h">A prompt is a graph, not a string.</h2>
+    <p class="sec-sub">
+      Each node is a discrete piece of logic — a persona, a constraint, a piece of context, a branch.
+      Edges define how they compose. Because the design is structured, the platform can validate it,
+      version it, and compile it to model-ready instructions on every change.
+    </p>
+
+    <div class="contrast">
+      <div class="compare bad">
+        <h4>Prompt as a text blob</h4>
+        <ul>
+          <li>One giant string, edited by hand</li>
+          <li>Guardrails copy-pasted across agents</li>
+          <li>A renamed variable silently breaks production</li>
+          <li>"Is it good?" is a vibe check</li>
+        </ul>
+      </div>
+      <div class="compare good">
+        <h4>Prompt as architecture</h4>
+        <ul>
+          <li>Typed nodes with explicit dependencies</li>
+          <li>Reusable skills — change once, propagate</li>
+          <li>An enforced input contract per version</li>
+          <li>Diagnostics catch errors before deploy</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-top: 8px;">
+    <div class="sec-label">What you get</div>
+    <h2 class="sec-h">A studio for agent logic.</h2>
+
+    <div class="grid">
+      <div class="node">
+        <div class="kind">Visual graph studio</div>
+        <div class="title">Design on a canvas</div>
+        <div class="body">Persona, constraint, context, conditional, skill, memory, tool, evaluation and output nodes — composed visually instead of buried in prose.</div>
+      </div>
+      <div class="node green">
+        <div class="kind">Variable contract</div>
+        <div class="title">Inputs that can't drift</div>
+        <div class="body">Write <code>{variable}</code> anywhere. The studio discovers every variable, maps producers and consumers, and flags what's undefined or unused.</div>
+      </div>
+      <div class="node amber">
+        <div class="kind">Diagnostics</div>
+        <div class="title">A linter for prompts</div>
+        <div class="body">Cycle detection, floating nodes, missing persona/output, conflicting instructions — surfaced live, before anything ships.</div>
+      </div>
+      <div class="node violet">
+        <div class="kind">Skill registry</div>
+        <div class="title">Reusable, not copy-pasted</div>
+        <div class="body">Skills, policies, schemas and memory templates are first-class assets. Link them into many graphs; update the source once.</div>
+      </div>
+      <div class="node">
+        <div class="kind">Compiler</div>
+        <div class="title">Model-ready output</div>
+        <div class="body">Assembles nodes in dependency order and compiles to provider-specific formats, with token and cost estimates.</div>
+      </div>
+      <div class="node green">
+        <div class="kind">Deployment</div>
+        <div class="title">Pinned & versioned</div>
+        <div class="body">Publish a graph version to dev, staging or production. Applications fetch a pinned version and inject runtime variables.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-top: 8px;">
+    <div class="sec-label">The canvas</div>
+    <h2 class="sec-h">Read an agent at a glance.</h2>
+    <p class="sec-sub">Typed blueprint nodes, conditional diamonds with yes/no routing, and inline variable highlighting — review an agent you didn't write the way you'd review code.</p>
+    <div class="shot" style="margin-top: 30px;">
+      <div class="shot-head">
+        <span class="dot" style="background: var(--amber)"></span>
+        <span class="dot" style="background: var(--green)"></span>
+        <span class="dot" style="background: var(--indigo)"></span>
+        <span style="margin-left:6px">canvas</span>
+      </div>
+      <img src="studio-canvas.png" alt="Graph canvas with typed blueprint nodes, conditional diamonds, and variable highlighting" />
+    </div>
+  </section>
+
+  <footer class="wrap">
+    <span>Newtonian Spark · Phoenix LiveView · Ash · SvelteFlow</span>
+    <span><a href="https://github.com/sunprema/nspark">github.com/sunprema/nspark</a></span>
+  </footer>
+</body>
+</html>
