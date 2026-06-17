@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AshDurableWorkflow — Durable Computing Review</title>
+<meta name="description" content="A declarative, durable workflow engine for Ash applications. Bridges Ash.Reactor and Oban so workflows survive crashes and deploys." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink:        #16130d;
+    --ink-soft:   #423b2e;
+    --paper:      #f4ecd8;
+    --paper-2:    #efe5cc;
+    --rule:       #2a251c;
+    --red:        #c1272d;
+    --red-deep:   #8f1418;
+    --blue:       #1d3f73;
+    --teal:       #0f6b5f;
+    --amber:      #d98a16;
+    --halftone:   rgba(22,19,13,0.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      repeating-linear-gradient(0deg, transparent 0 3px, var(--halftone) 3px 4px),
+      #d8cdb2;
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 28px 16px 60px;
+  }
+
+  /* ---- The "magazine page" sheet ---- */
+  .issue {
+    max-width: 1040px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    box-shadow: 0 2px 0 var(--rule), 14px 18px 40px rgba(0,0,0,0.35);
+    background-image:
+      radial-gradient(circle at 18% 30%, rgba(193,39,45,0.03) 0, transparent 40%),
+      radial-gradient(circle at 82% 70%, rgba(29,63,115,0.04) 0, transparent 42%);
+  }
+
+  /* ---- Masthead ---- */
+  .masthead {
+    border-bottom: 4px double var(--rule);
+    padding: 14px 26px 12px;
+  }
+  .masthead-top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font: 600 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .masthead-top .price { color: var(--red-deep); }
+  .logo {
+    font-family: "Oswald", sans-serif;
+    font-weight: 700; letter-spacing: -0.01em; line-height: 0.92;
+    font-size: clamp(40px, 8.5vw, 92px);
+    text-transform: uppercase; margin: 6px 0 2px;
+    color: var(--ink);
+  }
+  .logo .pc { color: var(--red); }
+  .tagline {
+    font: 500 12.5px/1.3 "IBM Plex Mono", monospace;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-soft); border-top: 1px solid var(--rule);
+    padding-top: 8px; margin-top: 6px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  /* ---- Cover banner ---- */
+  .banner {
+    background: var(--red);
+    color: #fff5e6;
+    padding: 18px 26px;
+    border-bottom: 3px solid var(--rule);
+    position: relative; overflow: hidden;
+  }
+  .banner::after {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(135deg, rgba(255,255,255,0.06) 0 6px, transparent 6px 12px);
+    pointer-events: none;
+  }
+  .banner .kicker {
+    font: 700 12px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: #ffe2a8;
+  }
+  .banner h1 {
+    font-family: "Oswald", sans-serif; font-weight: 700;
+    font-size: clamp(28px, 5.4vw, 52px); line-height: 1.02;
+    margin: 8px 0 6px; text-transform: uppercase; letter-spacing: -0.01em;
+  }
+  .banner p {
+    margin: 0; max-width: 760px; font-size: 16px; line-height: 1.45;
+    color: #fdeccf;
+  }
+
+  /* ---- Body grid ---- */
+  .layout {
+    display: grid; grid-template-columns: 1fr 320px; gap: 0;
+  }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .main { padding: 26px 26px 30px; border-right: 1px solid var(--rule); }
+  @media (max-width: 860px) { .main { border-right: none; border-bottom: 1px solid var(--rule); } }
+  .rail { padding: 26px 22px 30px; background: var(--paper-2); }
+
+  .dek {
+    font-size: 17px; line-height: 1.55; color: var(--ink-soft);
+    border-left: 3px solid var(--red); padding-left: 14px; margin: 0 0 20px;
+  }
+
+  .cols { column-count: 2; column-gap: 26px; column-rule: 1px solid rgba(42,37,28,0.25); }
+  @media (max-width: 620px) { .cols { column-count: 1; } }
+  .cols p { margin: 0 0 12px; font-size: 14.5px; }
+  .cols p:first-of-type { margin-top: 0; }
+  .dropcap::first-letter {
+    font-family: "Oswald", sans-serif; font-weight: 700;
+    float: left; font-size: 58px; line-height: 0.78; padding: 4px 8px 0 0;
+    color: var(--red);
+  }
+
+  h2.section {
+    font-family: "Oswald", sans-serif; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.02em;
+    font-size: 22px; margin: 30px 0 4px; padding-bottom: 6px;
+    border-bottom: 2px solid var(--rule);
+    break-after: avoid;
+  }
+  h2.section .num {
+    color: var(--red); font-family: "IBM Plex Mono", monospace; font-size: 15px;
+    margin-right: 8px; vertical-align: 2px;
+  }
+
+  /* ---- Feature spec list ---- */
+  .specs { margin: 16px 0 4px; border-top: 1px solid var(--rule); }
+  .spec {
+    display: grid; grid-template-columns: 30px 1fr; gap: 14px;
+    padding: 13px 4px; border-bottom: 1px solid rgba(42,37,28,0.28);
+    break-inside: avoid;
+  }
+  .spec .badge {
+    font-family: "Oswald", sans-serif; font-weight: 700; font-size: 19px;
+    color: var(--red); text-align: center; line-height: 1.2;
+  }
+  .spec h3 {
+    margin: 0 0 3px; font-family: "Oswald", sans-serif; font-weight: 600;
+    font-size: 16.5px; letter-spacing: 0.01em; text-transform: uppercase;
+  }
+  .spec p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .spec code { font-size: 12.5px; }
+
+  code, pre, kbd { font-family: "IBM Plex Mono", monospace; }
+  code { background: rgba(29,63,115,0.10); padding: 1px 5px; border-radius: 3px; font-size: 0.86em; color: var(--blue); }
+
+  /* ---- Code listing ---- */
+  figure.listing { margin: 18px 0; break-inside: avoid; }
+  figure.listing figcaption {
+    font: 600 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #fff;
+    background: var(--ink); padding: 7px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  figure.listing figcaption .tag { color: var(--amber); }
+  pre.code {
+    margin: 0; background: #1b1812; color: #e9dec3;
+    padding: 16px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.65;
+    border: 1px solid var(--ink); border-top: none;
+  }
+  pre.code .c { color: #8a8470; font-style: italic; }   /* comment */
+  pre.code .k { color: #e88f7a; }                        /* keyword */
+  pre.code .a { color: #7fc7b6; }                        /* atom */
+  pre.code .s { color: #d9b56a; }                        /* string */
+  pre.code .m { color: #9bb6e0; }                        /* module */
+
+  /* ---- Rail widgets ---- */
+  .widget { border: 2px solid var(--rule); margin-bottom: 22px; background: var(--paper); }
+  .widget .head {
+    background: var(--ink); color: var(--paper);
+    font: 700 12px/1 "IBM Plex Mono", monospace; letter-spacing: 0.14em;
+    text-transform: uppercase; padding: 9px 12px;
+  }
+  .widget .body { padding: 13px 14px; }
+
+  .verdict .score {
+    font-family: "Oswald", sans-serif; font-weight: 700;
+    font-size: 60px; line-height: 1; color: var(--red); text-align: center;
+  }
+  .verdict .score span { font-size: 22px; color: var(--ink-soft); }
+  .verdict .label {
+    text-align: center; font: 600 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft);
+    margin-top: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--rule);
+  }
+  .verdict ul { list-style: none; padding: 0; margin: 12px 0 0; font-size: 13.5px; }
+  .verdict li { display: flex; gap: 8px; padding: 4px 0; }
+  .verdict li::before { content: "✔"; color: var(--teal); font-weight: 700; }
+  .verdict li.con::before { content: "✘"; color: var(--red); }
+
+  .speclist dt {
+    font: 600 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--red-deep); margin-top: 11px;
+  }
+  .speclist dt:first-child { margin-top: 0; }
+  .speclist dd { margin: 3px 0 0; font-size: 13.5px; color: var(--ink); }
+
+  .pullquote {
+    font-family: "Oswald", sans-serif; font-weight: 600; font-size: 19px;
+    line-height: 1.25; color: var(--ink);
+    border-top: 3px solid var(--red); border-bottom: 3px solid var(--red);
+    padding: 14px 2px; margin: 18px 0; text-transform: uppercase;
+    letter-spacing: 0.005em;
+  }
+  .pullquote span { color: var(--red); }
+
+  /* ---- Flow diagram ---- */
+  .flow {
+    border: 2px solid var(--rule); background: var(--paper);
+    padding: 14px; margin: 18px 0; break-inside: avoid;
+  }
+  .flow .flow-title {
+    font: 700 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-soft); margin-bottom: 12px;
+  }
+  .flow pre {
+    margin: 0; font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    line-height: 1.5; color: var(--ink); white-space: pre; overflow-x: auto;
+  }
+
+  .cta {
+    margin-top: 26px; border: 3px double var(--rule);
+    background: var(--paper-2); padding: 18px 20px; break-inside: avoid;
+  }
+  .cta h3 {
+    font-family: "Oswald", sans-serif; text-transform: uppercase;
+    margin: 0 0 6px; font-size: 20px; letter-spacing: 0.01em;
+  }
+  .cta p { margin: 0 0 12px; font-size: 14px; color: var(--ink-soft); }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn {
+    font: 600 12px/1 "IBM Plex Mono", monospace; letter-spacing: 0.08em;
+    text-transform: uppercase; text-decoration: none;
+    padding: 11px 16px; border: 2px solid var(--rule);
+    background: var(--ink); color: var(--paper);
+    transition: transform 0.12s ease, background 0.12s ease;
+  }
+  .btn:hover { transform: translate(-1px,-1px); background: var(--red); border-color: var(--red-deep); }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn.ghost:hover { background: var(--ink); color: var(--paper); }
+
+  /* ---- Footer / colophon ---- */
+  .colophon {
+    border-top: 4px double var(--rule);
+    padding: 14px 26px 18px; display: flex; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+    font: 500 11px/1.4 "IBM Plex Mono", monospace; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  .colophon a { color: var(--blue); text-decoration: none; }
+  .back { text-align: center; margin: 26px auto 0; }
+  .back a {
+    font: 600 12px/1 "IBM Plex Mono", monospace; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #2a251c; text-decoration: none;
+    border-bottom: 2px solid var(--red);
+  }
+</style>
+</head>
+<body>
+  <article class="issue">
+
+    <!-- MASTHEAD -->
+    <header class="masthead">
+      <div class="masthead-top">
+        <span>Vol. 1 · No. 1 · Durable Computing Review</span>
+        <span class="price">June 2026 · $0.00 · Open Source</span>
+      </div>
+      <div class="logo"><span class="pc">ELIXIR</span> WORKFLOW</div>
+      <div class="tagline">
+        <span>The Magazine of Crash-Proof Background Jobs</span>
+        <span>Ash · Reactor · Oban · PostgreSQL</span>
+      </div>
+    </header>
+
+    <!-- COVER BANNER -->
+    <div class="banner">
+      <div class="kicker">★ Cover Story · First Look ★</div>
+      <h1>AshDurableWorkflow</h1>
+      <p>A declarative, <strong>durable</strong> workflow engine for Ash applications. It bridges <code style="background:rgba(255,255,255,.18);color:#fff">Ash.Reactor</code> and <code style="background:rgba(255,255,255,.18);color:#fff">Oban</code> so your multi-step processes survive application restarts and node crashes — checkpointing to the database after <em>every</em> step and resuming from exactly where they stopped.</p>
+    </div>
+
+    <div class="layout">
+      <!-- MAIN COLUMN -->
+      <div class="main">
+        <p class="dek">REVIEWED THIS ISSUE — A workflow engine that treats "the server died mid-checkout" as a routine event, not a catastrophe. Charge the card once. Ship once. Resume the rest. We put it on the bench.</p>
+
+        <div class="cols">
+          <p class="dropcap">EVERY developer who has wired up a multi-step background job knows the dread: the process crashes after step three of five, the retry runs the whole thing again, and suddenly a customer's card is charged twice. AshDurableWorkflow exists to make that class of bug structurally impossible.</p>
+          <p>The premise is simple but powerful. You describe your process as an ordinary <code>Ash.Reactor</code> — a graph of steps with explicit dependencies. AshDurableWorkflow then drives that Reactor <strong>one step at a time</strong> inside an Oban job. After each step completes, it serializes the entire Reactor state into a dedicated database table. That serialized snapshot is a <em>checkpoint</em>.</p>
+          <p>If the node dies, the deploy rolls, or the BEAM simply hiccups, Oban retries the job — and the worker finds the last checkpoint, deserializes it, and continues from the next unfinished step. Completed steps are <strong>never</strong> re-run. The engine calls <code>Reactor.run/4</code> with <code>max_iterations: 1</code> and <code>async?: false</code>, looping until the workflow reports <code>{:ok, result}</code>.</p>
+          <p>The result is a programming model where "exactly-once-on-resume" is the default, retries come with Oban's exponential backoff for free, and the whole apparatus is declared in a few lines of a Spark DSL inside your existing Ash resource.</p>
+        </div>
+
+        <div class="pullquote">
+          "It treats a mid-checkout crash as a <span>routine event</span> — not a 2 a.m. incident. Resume from the last checkpoint and move on."
+        </div>
+
+        <!-- FEATURE BENCHMARK -->
+        <h2 class="section"><span class="num">01</span> On The Bench — Feature Rundown</h2>
+        <div class="specs">
+          <div class="spec">
+            <div class="badge">①</div>
+            <div>
+              <h3>Durable Checkpointing</h3>
+              <p>State is snapshotted with <code>:erlang.term_to_binary/1</code> after every successful step. Bit-perfect Reactor restoration — no replay, no guesswork.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">②</div>
+            <div>
+              <h3>Resume, Don't Restart</h3>
+              <p>An interrupted workflow picks up at its last checkpoint. A worker crash becomes an Oban retry that finds the <code>:halted</code> snapshot and continues.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">③</div>
+            <div>
+              <h3>Exactly-Once Steps</h3>
+              <p>Across the full resumed lifecycle, each completed step runs at most once. Pair with idempotency keys to make failed-step retries safe too.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">④</div>
+            <div>
+              <h3>Declarative Spark DSL</h3>
+              <p>A clean <code>durable_workflow do … end</code> block on any Ash resource. Map inputs from record attributes or static values, no boilerplate.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">⑤</div>
+            <div>
+              <h3>Isolated Storage</h3>
+              <p>Checkpoints live in a library-managed <code>ash_durable_workflow_states</code> table. Your domain tables stay pure.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">⑥</div>
+            <div>
+              <h3>Retention Policies</h3>
+              <p><code>:keep</code> for a full audit trail, <code>:clear_state</code> to drop the heavy blob, <code>:destroy</code> to remove it — applied immediately or deferred via a scheduled job.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">⑦</div>
+            <div>
+              <h3>Oban Retries &amp; Backoff</h3>
+              <p>Failures ride Oban's persistent queue with exponential backoff. Tune <code>max_attempts</code> right in the DSL.</p>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="badge">⑧</div>
+            <div>
+              <h3>Igniter Installer</h3>
+              <p>One command — <code>mix igniter.install</code> — wires up Oban, the queue, the repo config, and the storage domain. Then codegen the migrations.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- HANDS ON -->
+        <h2 class="section"><span class="num">02</span> Hands On — A Checkout Saga</h2>
+        <div class="cols">
+          <p>Declaring a workflow takes three pieces: the steps, a Reactor that wires them into a dependency chain, and the resource that makes it durable. Add the extension, point it at your Reactor, map the inputs, and you are done.</p>
+          <p>The DSL below charges a card, reserves stock, and sends a confirmation. If the box dies after the charge but before the shipment, the retry resumes at <code>:ship</code> — the card is not charged twice, because that step's result is already in the checkpoint.</p>
+        </div>
+
+        <figure class="listing">
+          <figcaption><span>order.ex</span><span class="tag">// elixir</span></figcaption>
+<pre class="code"><span class="k">defmodule</span> <span class="m">MyApp.Order</span> <span class="k">do</span>
+  <span class="k">use</span> <span class="m">Ash.Resource</span>,
+    domain: <span class="m">MyApp.Sales</span>,
+    data_layer: <span class="m">AshPostgres.DataLayer</span>,
+    extensions: [<span class="m">AshDurableWorkflow</span>]   <span class="c"># ← add the extension</span>
+
+  <span class="a">durable_workflow</span> <span class="k">do</span>
+    <span class="a">reactor</span> <span class="m">MyApp.Checkout.Reactor</span>
+    <span class="a">queue</span> <span class="a">:durable_workflow</span>
+    <span class="a">max_attempts</span> <span class="s">3</span>
+
+    <span class="c"># keep a week for support, then delete</span>
+    <span class="a">retention_policy</span> {<span class="a">:destroy</span>, after: {<span class="s">7</span>, <span class="a">:days</span>}}
+
+    <span class="c"># map Reactor inputs from the record…</span>
+    <span class="a">input</span> <span class="a">:order_id</span>, {<span class="a">:attr</span>, <span class="a">:id</span>}
+    <span class="a">input</span> <span class="a">:amount</span>,   {<span class="a">:attr</span>, <span class="a">:total_cents</span>}
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+        </figure>
+
+        <div class="cols">
+          <p>Kicking it off is a single function call. It enqueues an Oban job; the worker resolves the inputs from the record and begins stepping. Extra inputs passed at call time are merged over the DSL inputs and win.</p>
+          <p>Crucially, you always go through <code>run_workflow/2</code> — never <code>Reactor.run/4</code> directly — so execution stays checkpointed and resumable.</p>
+        </div>
+
+        <figure class="listing">
+          <figcaption><span>iex</span><span class="tag">// start &amp; resume</span></figcaption>
+<pre class="code"><span class="c"># enqueue a durable job for this record</span>
+<span class="m">AshDurableWorkflow</span>.<span class="a">run_workflow</span>(order)
+
+<span class="c"># extra inputs are merged OVER the DSL inputs</span>
+<span class="m">AshDurableWorkflow</span>.<span class="a">run_workflow</span>(order, %{coupon: <span class="s">"SAVE10"</span>})</pre>
+        </figure>
+
+        <!-- ARCHITECTURE -->
+        <h2 class="section"><span class="num">03</span> Under The Hood — The Checkpoint Loop</h2>
+        <div class="cols">
+          <p>The engine's heart is a loop in the <code>Runner</code>. Each iteration runs exactly one step; the executor hands back <code>{:halted, reactor}</code>; that struct is serialized into a <code>WorkflowState</code> row before the next step runs. On success the configured retention policy fires.</p>
+          <p>Because state is serialized at every boundary, the rule is simple: keep it serializable. Pass references — S3 keys, row ids — between steps, not PIDs, sockets, or giant blobs.</p>
+        </div>
+
+        <div class="flow">
+          <div class="flow-title">▌Figure 1 — Execution &amp; Checkpoint Flow</div>
+<pre>run_workflow(record) ──▶ Oban job ──▶ AshDurableWorkflow.Worker
+                                            │  find / create WorkflowState
+                                            ▼  (isolated table)
+                                   AshDurableWorkflow.Runner
+        ┌──────────── loop: one step at a time (async? false) ───────────┐
+        │  {:halted, reactor} ─▶ term_to_binary ─▶ ✓ checkpoint row       │
+        └────────────────────────────────────────────────────────────────┘
+                                            │
+                       {:ok, result} ──▶ apply retention policy
+                       {:error, _}    ──▶ Oban retry resumes from checkpoint</pre>
+        </div>
+
+        <!-- CTA -->
+        <div class="cta">
+          <h3>Get It Running</h3>
+          <p>Install into any Ash + PostgreSQL app, generate the migrations, and declare your first durable workflow.</p>
+<figure class="listing" style="margin:0 0 14px;">
+  <figcaption><span>shell</span><span class="tag">// install</span></figcaption>
+<pre class="code">mix igniter.install ash_durable_workflow
+mix ash.codegen install_ash_durable_workflow
+mix ash.migrate</pre>
+</figure>
+          <div class="btnrow">
+            <a class="btn" href="https://github.com/sunprema/ash_durable_workflow" target="_blank" rel="noopener">Source on GitHub →</a>
+            <a class="btn ghost" href="https://github.com/sunprema/ash_durable_workflow/blob/main/USER_GUIDE.md" target="_blank" rel="noopener">Read the User Guide</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT RAIL -->
+      <aside class="rail">
+        <div class="widget verdict">
+          <div class="head">★ The Verdict</div>
+          <div class="body">
+            <div class="score">A<span>/durable</span></div>
+            <div class="label">Editors' Choice</div>
+            <ul>
+              <li>Survives crashes &amp; deploys</li>
+              <li>Exactly-once on resume</li>
+              <li>Declarative, tiny DSL</li>
+              <li>Free Oban retries + backoff</li>
+              <li class="con">Sequential — no async fan-out</li>
+              <li class="con">State must be serializable</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="widget">
+          <div class="head">⚙ Spec Sheet</div>
+          <div class="body">
+            <dl class="speclist">
+              <dt>Engine</dt><dd>Ash.Reactor, stepped 1×</dd>
+              <dt>Queue</dt><dd>Oban (PostgreSQL)</dd>
+              <dt>Serialization</dt><dd>:erlang.term_to_binary/1</dd>
+              <dt>Storage</dt><dd>ash_durable_workflow_states</dd>
+              <dt>Config</dt><dd>Spark DSL extension</dd>
+              <dt>Install</dt><dd>mix igniter.install</dd>
+              <dt>License</dt><dd>Open source</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="widget">
+          <div class="head">⚑ Retention At A Glance</div>
+          <div class="body">
+            <dl class="speclist">
+              <dt>:keep</dt><dd>Retain record + state. Full audit trail.</dd>
+              <dt>:clear_state</dt><dd>Keep the row, drop the heavy blob. <em>(default)</em></dd>
+              <dt>:destroy</dt><dd>Delete the checkpoint outright.</dd>
+              <dt>{action, after: …}</dt><dd>Defer cleanup via a scheduled Oban job, e.g. <code>{:destroy, after: {24, :hour}}</code>.</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="widget">
+          <div class="head">✓ Best For</div>
+          <div class="body" style="font-size:13.5px;">
+            Checkout sagas · account provisioning · cross-service sync · billing lifecycles · approval &amp; compliance flows · deployment orchestration · expensive data pipelines.
+          </div>
+        </div>
+
+        <div class="widget" style="border-color:var(--red);">
+          <div class="head" style="background:var(--red-deep);">⚠ Field Note</div>
+          <div class="body" style="font-size:13.5px;">
+            A <em>failing</em> step is retried, so guard external side effects with an <strong>idempotency key</strong> (e.g. <code>"charge:#{order_id}"</code>). Need rollback? Reactor's <code>compensate/4</code> &amp; <code>undo/4</code> have you covered.
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- COLOPHON -->
+    <footer class="colophon">
+      <span>AshDurableWorkflow · Durable Computing Review</span>
+      <span><a href="https://github.com/sunprema/ash_durable_workflow">github.com/sunprema/ash_durable_workflow</a></span>
+      <span>Set in Oswald &amp; Source Serif · Printed on GitHub Pages</span>
+    </footer>
+  </article>
+
+  <div class="back"><a href="../">← Back to the gallery</a></div>
+</body>
+</html>
