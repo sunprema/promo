@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Knowledge Bank — Knowledge is Power</title>
+<meta name="description" content="A local-first second brain for research. Ingest papers, search by meaning, and let an associative cortex surface the connections you'd never think to look for. Knowledge is Power." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg-0:   #05060d;
+    --bg-1:   #0a0b1a;
+    --ink:    #ECE9F5;
+    --ink-soft:#A7A3C2;
+    --ink-mute:#6B6890;
+    --teal:   #5EEAD4;
+    --violet: #B79CFF;
+    --gold:   #FFD98E;
+    --rose:   #FF9EC4;
+    --line:   rgba(183,156,255,0.16);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg-0);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+  .serif { font-family: "Spectral", Georgia, serif; }
+
+  /* ── the living-brain canvas, fixed behind everything ── */
+  #brain {
+    position: fixed; inset: 0; width: 100vw; height: 100vh;
+    z-index: 0; display: block;
+  }
+  /* breathing vignette + aurora wash over the canvas */
+  .veil {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 42%, transparent 0%, rgba(5,6,13,0.35) 60%, rgba(5,6,13,0.92) 100%),
+      radial-gradient(ellipse 90% 60% at 80% 110%, rgba(183,156,255,0.10), transparent 55%),
+      radial-gradient(ellipse 80% 60% at 15% -10%, rgba(94,234,212,0.08), transparent 55%);
+  }
+
+  .wrap { position: relative; z-index: 2; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── hero ── */
+  .hero {
+    position: relative; z-index: 2;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 24px;
+  }
+  .eyebrow {
+    font: 600 12px "IBM Plex Mono", monospace; letter-spacing: 0.34em;
+    text-transform: uppercase; color: var(--teal);
+    text-shadow: 0 0 18px rgba(94,234,212,0.5);
+    margin-bottom: 30px;
+    animation: fade 1.4s ease both;
+  }
+  .motto {
+    font-family: "Spectral", serif;
+    font-weight: 300;
+    font-size: clamp(48px, 11vw, 132px);
+    line-height: 0.96; letter-spacing: -0.02em;
+    margin: 0;
+    background: linear-gradient(180deg, #FFFFFF 0%, #E7E0FF 42%, #B79CFF 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 8px 50px rgba(183,156,255,0.35));
+    animation: rise 1.5s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .motto em { font-style: italic; color: var(--gold);
+    -webkit-text-fill-color: var(--gold);
+    filter: drop-shadow(0 0 28px rgba(255,217,142,0.45)); }
+  .lede {
+    max-width: 600px; margin: 28px auto 0;
+    font-size: clamp(16px, 2.2vw, 20px); line-height: 1.65;
+    color: var(--ink-soft);
+    animation: rise 1.6s 0.15s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .cta-row {
+    margin-top: 40px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+    animation: rise 1.7s 0.3s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .btn {
+    text-decoration: none; font: 600 13px "IBM Plex Mono", monospace;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 14px 26px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+    backdrop-filter: blur(6px);
+  }
+  .btn.primary {
+    background: linear-gradient(180deg, rgba(94,234,212,0.18), rgba(183,156,255,0.16));
+    border-color: rgba(94,234,212,0.5);
+    box-shadow: 0 0 0 1px rgba(94,234,212,0.08), 0 14px 40px rgba(94,234,212,0.12);
+  }
+  .btn:hover { transform: translateY(-2px); border-color: rgba(183,156,255,0.7);
+    box-shadow: 0 18px 50px rgba(183,156,255,0.22); }
+  .scrollcue {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+    font: 500 11px "IBM Plex Mono", monospace; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--ink-mute);
+    animation: bob 2.4s ease-in-out infinite;
+  }
+
+  /* ── content sections ── */
+  section.band { position: relative; z-index: 2; padding: 92px 0; }
+  .band.tint { background: linear-gradient(180deg, transparent, rgba(10,11,26,0.72) 14%, rgba(10,11,26,0.72) 86%, transparent); }
+
+  .kicker {
+    font: 600 12px "IBM Plex Mono", monospace; letter-spacing: 0.28em;
+    text-transform: uppercase; color: var(--violet); margin: 0 0 14px;
+  }
+  h2.title {
+    font-family: "Spectral", serif; font-weight: 400;
+    font-size: clamp(30px, 5vw, 46px); line-height: 1.1; letter-spacing: -0.015em;
+    margin: 0 0 18px; max-width: 760px;
+  }
+  .title em { font-style: italic; color: var(--gold); }
+  .blurb { max-width: 680px; color: var(--ink-soft); font-size: 17px; line-height: 1.7; }
+
+  /* feature grid */
+  .features { margin-top: 54px; display: grid; gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+  .card {
+    position: relative; padding: 28px 26px; border-radius: 18px;
+    background: linear-gradient(180deg, rgba(20,22,42,0.66), rgba(10,11,26,0.5));
+    border: 1px solid var(--line);
+    box-shadow: 0 22px 60px rgba(2,3,10,0.45);
+    overflow: hidden;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; opacity: 0.5; pointer-events: none;
+    background: radial-gradient(120% 80% at 0% 0%, rgba(94,234,212,0.07), transparent 60%);
+  }
+  .card:hover { transform: translateY(-4px); border-color: rgba(183,156,255,0.45);
+    box-shadow: 0 30px 80px rgba(2,3,10,0.6), 0 0 36px rgba(183,156,255,0.08); }
+  .glyph { width: 40px; height: 40px; margin-bottom: 16px; display: block; }
+  .card h3 { font-size: 19px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: 14.5px; line-height: 1.62; }
+  .card .tag { display: inline-block; margin-top: 14px;
+    font: 600 10.5px "IBM Plex Mono", monospace; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--teal); }
+
+  /* terminal moment */
+  .term {
+    margin-top: 48px; border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--line); background: rgba(4,5,12,0.86);
+    box-shadow: 0 30px 80px rgba(2,3,10,0.6);
+    max-width: 760px;
+  }
+  .term .bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--line); }
+  .term .dot { width: 11px; height: 11px; border-radius: 50%; background: #2a2c44; }
+  .term .dot.r { background: #ff6b81; } .term .dot.y { background: #ffd98e; } .term .dot.g { background: #5eead4; }
+  .term .ttl { margin-left: 8px; font: 500 11.5px "IBM Plex Mono", monospace; color: var(--ink-mute); }
+  .term pre { margin: 0; padding: 22px 20px; font-family: "IBM Plex Mono", monospace;
+    font-size: 13px; line-height: 1.85; color: #C9C5E2; overflow-x: auto; }
+  .term .p { color: var(--teal); } .term .c { color: var(--ink-mute); }
+  .term .o { color: var(--gold); } .term .v { color: var(--violet); }
+
+  /* pillars / philosophy row */
+  .pillars { margin-top: 50px; display: grid; gap: 28px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .pillar { padding-left: 18px; border-left: 2px solid rgba(183,156,255,0.4); }
+  .pillar .n { font: 600 12px "IBM Plex Mono", monospace; color: var(--teal); letter-spacing: 0.1em; }
+  .pillar h4 { margin: 8px 0 6px; font-size: 17px; font-weight: 600; }
+  .pillar p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
+
+  /* closing */
+  .close { text-align: center; padding: 110px 24px 40px; position: relative; z-index: 2; }
+  .close .motto2 { font-family: "Spectral", serif; font-weight: 300; font-style: italic;
+    font-size: clamp(34px, 7vw, 70px); margin: 0;
+    background: linear-gradient(180deg, #FFFFFF, #B79CFF);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .close p { color: var(--ink-soft); margin: 18px auto 32px; max-width: 520px; line-height: 1.6; }
+  footer { position: relative; z-index: 2; text-align: center; padding: 30px;
+    font: 400 12px "IBM Plex Mono", monospace; color: var(--ink-mute);
+    border-top: 1px solid var(--line); }
+  footer a { color: var(--ink-soft); text-decoration: none; }
+  footer a:hover { color: var(--teal); }
+
+  /* reveal on scroll */
+  .reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes bob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(7px); } }
+
+  @media (max-width: 620px) {
+    section.band { padding: 70px 0; }
+    .term pre { font-size: 11.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, .reveal { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="brain"></canvas>
+<div class="veil"></div>
+
+<!-- ───────────────── HERO ───────────────── -->
+<header class="hero">
+  <div class="eyebrow">● Knowledge Bank</div>
+  <h1 class="motto">Knowledge<br/>is <em>Power</em></h1>
+  <p class="lede">A local-first second brain for the things you read. Capture a paper in one command, search it by <em>meaning</em>, and let an associative cortex surface the connections you'd never think to look for.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="#mind">Enter the mind ↓</a>
+    <a class="btn" href="https://github.com/sunprema/knowledge-bank" target="_blank" rel="noopener">View on GitHub</a>
+  </div>
+  <div class="scrollcue">scroll to wake the mind</div>
+</header>
+
+<!-- ───────────────── FEATURES ───────────────── -->
+<section class="band tint" id="mind">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="kicker">A mind, not a folder</p>
+      <h2 class="title">It doesn't just <em>store</em> what you read.<br/>It keeps <em>thinking</em> about it.</h2>
+      <p class="blurb">Every paper, web page, and idea you save becomes part of one living surface — embedded section by section, cross-linked, and quietly re-examined for the surprising connections that turn information into insight.</p>
+    </div>
+
+    <div class="features">
+      <div class="card reveal">
+        <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="#5EEAD4" stroke-width="1.6">
+          <circle cx="24" cy="24" r="3"/><circle cx="11" cy="14" r="2.4"/><circle cx="38" cy="13" r="2.4"/>
+          <circle cx="13" cy="36" r="2.4"/><circle cx="37" cy="35" r="2.4"/>
+          <path d="M24 24 11 14M24 24 38 13M24 24 13 36M24 24 37 35" opacity=".7"/>
+        </svg>
+        <h3>Search by meaning</h3>
+        <p>Hybrid retrieval fuses dense vector search with BM25 lexical ranking. Ask in any words you like — vocabulary drift across papers stops mattering, while exact tokens like an author or method name still land.</p>
+        <span class="tag">semantic · hybrid · multi-hop</span>
+      </div>
+
+      <div class="card reveal">
+        <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="#B79CFF" stroke-width="1.6">
+          <path d="M24 7c-7 0-12 4-12 11 0 4 2 6 2 9s-2 4-2 7c0 4 4 6 12 6"/>
+          <path d="M24 7c7 0 12 4 12 11 0 4-2 6-2 9s2 4 2 7c0 4-4 6-12 6"/>
+          <path d="M24 7v33M18 16h6M30 22h-6M18 30h6" opacity=".6"/>
+        </svg>
+        <h3>An associative cortex</h3>
+        <p>The Cortex layer keeps forming edges between everything you've saved — and surfaces the <em>unexpected</em> ones: "someone wished for this; someone else built it," or the same idea echoing across two unrelated fields.</p>
+        <span class="tag">sparks · need→solution</span>
+      </div>
+
+      <div class="card reveal">
+        <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="#FFD98E" stroke-width="1.6">
+          <circle cx="24" cy="24" r="16"/><circle cx="24" cy="24" r="9" opacity=".5"/>
+          <path d="M24 8v6M24 34v6M8 24h6M34 24h6" opacity=".7"/>
+          <circle cx="24" cy="24" r="2.4" fill="#FFD98E" stroke="none"/>
+        </svg>
+        <h3>Synthesis that compounds</h3>
+        <p>Write a reflection across several papers and it's embedded as a first-class document. Tomorrow's search retrieves today's thinking — your insight accrues instead of evaporating.</p>
+        <span class="tag">reflections · ideas · notes</span>
+      </div>
+
+      <div class="card reveal">
+        <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="#FF9EC4" stroke-width="1.6">
+          <rect x="8" y="10" width="32" height="28" rx="3"/>
+          <path d="M8 18h32M14 26h12M14 31h18" opacity=".7"/>
+          <circle cx="32" cy="29" r="1.6" fill="#FF9EC4" stroke="none"/>
+        </svg>
+        <h3>Always verifiable</h3>
+        <p>Every result deep-links straight into the source PDF at the right page. Claude's claims are one click from the canonical text — answers you can trust, not hallucinations you have to second-guess.</p>
+        <span class="tag">deep-links · cited chat</span>
+      </div>
+
+      <div class="card reveal">
+        <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="#5EEAD4" stroke-width="1.6">
+          <circle cx="14" cy="16" r="3"/><circle cx="34" cy="13" r="3"/><circle cx="33" cy="33" r="3"/><circle cx="15" cy="34" r="3"/><circle cx="24" cy="24" r="3"/>
+          <path d="M14 16l10 8M34 13l-10 11M33 33l-9-9M15 34l9-10" opacity=".6"/>
+        </svg>
+        <h3>See the whole graph</h3>
+        <p>A force-directed map of your corpus: a node per document, edges from explicit links and nearest-neighbor similarity. Wander by proximity and watch adjacent ideas pull together.</p>
+        <span class="tag">3D graph · related panel</span>
+      </div>
+
+      <div class="card reveal">
+        <svg class="glyph" viewBox="0 0 48 48" fill="none" stroke="#B79CFF" stroke-width="1.6">
+          <path d="M24 6l3 6 6 1-4 5 1 6-6-3-6 3 1-6-4-5 6-1z"/>
+          <path d="M14 36c0 3 4 5 10 5s10-2 10-5" opacity=".6"/>
+          <path d="M24 30v6" opacity=".6"/>
+        </svg>
+        <h3>Yours, and only yours</h3>
+        <p>A single Rust binary. No cloud, no telemetry, no account. Files are forever; the index is disposable and rebuildable. Runs from your laptop — or a USB drive in your pocket.</p>
+        <span class="tag">local-first · single binary</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────── THE COMMAND ───────────────── -->
+<section class="band">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="kicker">Ten seconds, one command</p>
+      <h2 class="title">Capture is effortless.<br/>Recall is <em>uncanny</em>.</h2>
+      <p class="blurb">No clipping, no tagging chores, no friction. Save it and move on — the mind does the rest in the background.</p>
+    </div>
+
+    <div class="term reveal">
+      <div class="bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="ttl">~/arxiv-kb — kb</span>
+      </div>
+<pre><span class="c"># save a paper — metadata, LaTeX, PDF, embeddings, all of it</span>
+<span class="p">$</span> kb add 2405.14831
+  <span class="o">✓</span> ingested HippoRAG: 9 sections embedded <span class="c">(14.2s)</span>
+
+<span class="c"># ask in your own words — meaning, not keywords</span>
+<span class="p">$</span> kb search <span class="v">"how do agents remember across sessions?"</span>
+  <span class="o">→</span> Generative Agents · <span class="c">§ method · p.4</span>
+  <span class="o">→</span> HippoRAG · <span class="c">§ method · p.6</span>
+
+<span class="c"># the surprising connections you'd never search for</span>
+<span class="p">$</span> kb spark --kind need_solution
+  <span class="o">✦</span> <span class="v">future_work</span> in one paper ←→ <span class="v">method</span> in another
+    <span class="c">"someone wished for this; someone built it"</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────── PHILOSOPHY ───────────────── -->
+<section class="band tint">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="kicker">The principles beneath it</p>
+      <h2 class="title">Built like a mind should be.</h2>
+    </div>
+    <div class="pillars">
+      <div class="pillar reveal">
+        <div class="n">01 · mindfulness</div>
+        <h4>Quiet by design</h4>
+        <p>No notifications, no feed, no dopamine loop. It waits for your attention and rewards it with depth.</p>
+      </div>
+      <div class="pillar reveal">
+        <div class="n">02 · consciousness</div>
+        <h4>Always reflecting</h4>
+        <p>Between your queries it keeps forming associations, so the corpus you return to is wiser than the one you left.</p>
+      </div>
+      <div class="pillar reveal">
+        <div class="n">03 · creativity</div>
+        <h4>Built for the leap</h4>
+        <p>The best ideas live where two distant fields touch. Cortex is tuned to find exactly those bridges.</p>
+      </div>
+      <div class="pillar reveal">
+        <div class="n">04 · memory</div>
+        <h4>Files are forever</h4>
+        <p>Your PDFs and notes are the source of truth. The index is derived state — delete it and rebuild it for free.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────── CLOSE ───────────────── -->
+<div class="close reveal">
+  <p class="motto2">Knowledge is Power.</p>
+  <p>Stop hoarding what you read. Start thinking with it.</p>
+  <div class="cta-row" style="justify-content:center">
+    <a class="btn primary" href="https://github.com/sunprema/knowledge-bank" target="_blank" rel="noopener">Get Knowledge Bank</a>
+  </div>
+</div>
+
+<footer>
+  Knowledge Bank — a local-first second brain · built in Rust ·
+  <a href="../">more demos</a>
+</footer>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('brain');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setClearColor(0x000000, 0);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+camera.position.z = 30;
+
+// ── build a brain-like point cloud: two lobes shaped from noise-perturbed spheres ──
+const COUNT = 1400;
+const positions = new Float32Array(COUNT * 3);
+const seeds = new Float32Array(COUNT);     // per-point phase for the "breathing"/firing
+const baseColor = new THREE.Color();
+const colors = new Float32Array(COUNT * 3);
+const palette = [0x5EEAD4, 0xB79CFF, 0xFFD98E, 0xFF9EC4];
+
+const pts = []; // keep Vector3 for edge building
+for (let i = 0; i < COUNT; i++) {
+  // sample on a sphere, then squash + split into two hemispheres for a brain silhouette
+  const u = Math.random(), v = Math.random();
+  const theta = u * Math.PI * 2;
+  const phi = Math.acos(2 * v - 1);
+  let r = 9 + (Math.random() - 0.5) * 1.4;
+  let x = r * Math.sin(phi) * Math.cos(theta);
+  let y = r * Math.sin(phi) * Math.sin(theta) * 0.78;     // squash vertically
+  let z = r * Math.cos(phi) * 0.9;
+  // gyrus-like wrinkles
+  const w = 0.9;
+  x += Math.sin(y * 0.9 + z * 0.5) * w;
+  y += Math.sin(x * 0.8 + z * 0.6) * w;
+  // split lobes: nudge away from the central sagittal plane
+  x += Math.sign(x || 1) * 1.6;
+
+  positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+  seeds[i] = Math.random() * Math.PI * 2;
+  pts.push(new THREE.Vector3(x, y, z));
+
+  baseColor.setHex(palette[i % palette.length]);
+  colors[i*3] = baseColor.r; colors[i*3+1] = baseColor.g; colors[i*3+2] = baseColor.b;
+}
+
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+// soft round sprite for each neuron
+const sprite = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(32,32,0,32,32,32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.25, 'rgba(255,255,255,0.85)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+})();
+
+const mat = new THREE.PointsMaterial({
+  size: 0.55, map: sprite, vertexColors: true, transparent: true,
+  depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.9
+});
+const points = new THREE.Points(geo, mat);
+scene.add(points);
+
+// ── synaptic connections: link near neighbours ──
+const linePos = [];
+for (let i = 0; i < COUNT; i += 2) {
+  let best = -1, bestD = 6.5;   // only connect reasonably close points
+  for (let j = i + 1; j < Math.min(i + 60, COUNT); j++) {
+    const d = pts[i].distanceTo(pts[j]);
+    if (d < bestD) { bestD = d; best = j; }
+  }
+  if (best >= 0) {
+    linePos.push(pts[i].x, pts[i].y, pts[i].z, pts[best].x, pts[best].y, pts[best].z);
+  }
+}
+const lgeo = new THREE.BufferGeometry();
+lgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(linePos), 3));
+const lmat = new THREE.LineBasicMaterial({ color: 0x7d7ab0, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending });
+const lines = new THREE.LineSegments(lgeo, lmat);
+scene.add(lines);
+
+const group = new THREE.Group();
+group.add(points); group.add(lines);
+scene.remove(points); scene.remove(lines);
+scene.add(group);
+
+// pointer parallax
+let px = 0, py = 0, tx = 0, ty = 0;
+window.addEventListener('pointermove', (e) => {
+  tx = (e.clientX / window.innerWidth - 0.5);
+  ty = (e.clientY / window.innerHeight - 0.5);
+}, { passive: true });
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+const colAttr = geo.attributes.color;
+const clock = new THREE.Clock();
+
+function tick() {
+  const t = clock.getElapsedTime();
+  // gentle autonomous rotation + pointer parallax = a slowly turning, breathing brain
+  px += (tx - px) * 0.04; py += (ty - py) * 0.04;
+  group.rotation.y = t * 0.06 + px * 0.7;
+  group.rotation.x = py * 0.5 + Math.sin(t * 0.15) * 0.05;
+
+  // "breathing" scale + neurons firing (brightness pulses)
+  const breath = 1 + Math.sin(t * 0.5) * 0.025;
+  group.scale.setScalar(breath);
+
+  for (let i = 0; i < COUNT; i++) {
+    const fire = 0.55 + 0.45 * Math.pow(Math.max(0, Math.sin(t * 1.4 + seeds[i])), 6);
+    baseColor.setHex(palette[i % palette.length]);
+    colAttr.array[i*3]   = baseColor.r * fire;
+    colAttr.array[i*3+1] = baseColor.g * fire;
+    colAttr.array[i*3+2] = baseColor.b * fire;
+  }
+  colAttr.needsUpdate = true;
+  lmat.opacity = 0.10 + Math.sin(t * 0.5) * 0.04;
+
+  renderer.render(scene, camera);
+  if (!reduce) requestAnimationFrame(tick);
+}
+tick();
+if (reduce) renderer.render(scene, camera); // one static frame
+
+// ── scroll reveal ──
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+}, { threshold: 0.16 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
