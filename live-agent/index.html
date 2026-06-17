@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LiveAgent — LiveView Intelligence Console</title>
+<meta name="description" content="An MCP server for Phoenix LiveView that gives Claude Code live read access — and hands — to what's rendered on screen." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:        #06090e;
+    --bg2:       #0a0e15;
+    --panel:     rgba(13, 18, 26, 0.72);
+    --panel-2:   rgba(17, 23, 33, 0.9);
+    --line:      rgba(120, 150, 180, 0.14);
+    --line-2:    rgba(120, 150, 180, 0.28);
+    --ink:       #cdd8e3;
+    --ink-dim:   #7d8a99;
+    --ink-faint: #4d5763;
+    --cyan:      #45b6d8;
+    --cyan-glow: rgba(69, 182, 216, 0.5);
+    --amber:     #e0a558;
+    --green:     #46c9a0;
+    --red:       #e0605d;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sans: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--bg);
+    overflow-x: hidden;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: rgba(69,182,216,0.3); color: #fff; }
+
+  /* ---- Background field ---- */
+  #grid-canvas {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    opacity: 0.6;
+  }
+  .vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(ellipse 120% 80% at 50% -10%, rgba(28,52,78,0.55) 0%, transparent 55%),
+      radial-gradient(ellipse 90% 60% at 50% 120%, rgba(10,18,30,0.6) 0%, transparent 60%);
+  }
+  .scanline {
+    position: fixed; inset: 0; z-index: 2; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent 0, transparent 2px, rgba(0,0,0,0.16) 3px, transparent 4px);
+    opacity: 0.35; mix-blend-mode: overlay;
+  }
+
+  .wrap { position: relative; z-index: 3; max-width: 1180px; margin: 0 auto; padding: 0 22px; }
+
+  /* ---- Mono utility ---- */
+  .mono { font-family: var(--mono); }
+  .tag {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--ink-dim);
+  }
+  .accent { color: var(--cyan); }
+
+  /* ---- Boot overlay ---- */
+  #boot {
+    position: fixed; inset: 0; z-index: 100; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.6s ease;
+  }
+  #boot.done { opacity: 0; pointer-events: none; }
+  .boot-inner { width: min(520px, 86vw); font-family: var(--mono); font-size: 12px; }
+  .boot-title {
+    font-size: 13px; letter-spacing: 0.32em; color: var(--cyan);
+    text-transform: uppercase; margin-bottom: 18px;
+    text-shadow: 0 0 18px var(--cyan-glow);
+  }
+  .boot-line { color: var(--ink-dim); margin: 3px 0; opacity: 0; }
+  .boot-line .ok { color: var(--green); }
+  .boot-bar { margin-top: 16px; height: 2px; background: rgba(120,150,180,0.16); overflow: hidden; }
+  .boot-bar i { display: block; height: 100%; width: 0; background: var(--cyan); box-shadow: 0 0 12px var(--cyan-glow); }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(6,9,14,0.94), rgba(6,9,14,0.78));
+    backdrop-filter: blur(8px);
+  }
+  .topbar-in {
+    max-width: 1180px; margin: 0 auto; padding: 11px 22px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .bolt {
+    width: 22px; height: 22px; display: grid; place-items: center;
+    border: 1px solid var(--line-2); color: var(--cyan);
+    font-size: 12px; box-shadow: inset 0 0 12px rgba(69,182,216,0.18);
+  }
+  .brand b { font-family: var(--mono); font-weight: 600; letter-spacing: 0.16em; font-size: 13px; }
+  .brand b span { color: var(--ink-faint); }
+  .topbar .sep { flex: 1; }
+  .top-stat {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+    color: var(--ink-dim); display: flex; align-items: center; gap: 7px;
+  }
+  .top-stat.hide-sm { }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  .top-cta {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    color: var(--cyan); border: 1px solid var(--line-2); padding: 6px 12px;
+    text-decoration: none; text-transform: uppercase; transition: 0.15s;
+  }
+  .top-cta:hover { background: rgba(69,182,216,0.1); border-color: var(--cyan); }
+
+  /* ---- Section frame ---- */
+  section { padding: 64px 0; position: relative; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 26px; }
+  .sec-head .idx { font-family: var(--mono); font-size: 11px; color: var(--cyan); letter-spacing: 0.1em; }
+  .sec-head h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .sec-head .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); align-self: center; }
+
+  /* corner-bracket panel */
+  .panel { position: relative; background: var(--panel); border: 1px solid var(--line); }
+  .panel::before, .panel::after {
+    content: ""; position: absolute; width: 9px; height: 9px; pointer-events: none;
+    border-color: var(--line-2); border-style: solid;
+  }
+  .panel::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .panel::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+  /* ---- HERO ---- */
+  .hero { padding-top: 70px; }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 30px; align-items: stretch; }
+  .hero-eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--cyan); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .hero-eyebrow .ln { width: 38px; height: 1px; background: var(--cyan); opacity: 0.6; }
+  .hero h1 {
+    font-size: clamp(34px, 5.4vw, 60px); line-height: 1.02; font-weight: 700;
+    letter-spacing: -0.025em; margin: 0 0 22px;
+  }
+  .hero h1 em { font-style: normal; color: var(--cyan); text-shadow: 0 0 30px var(--cyan-glow); }
+  .hero .lead { font-size: 16.5px; color: var(--ink-dim); max-width: 520px; margin: 0 0 30px; line-height: 1.62; }
+  .hero .lead b { color: var(--ink); font-weight: 500; }
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 12px 20px; text-decoration: none; border: 1px solid var(--line-2);
+    color: var(--ink); transition: 0.16s; cursor: pointer; background: transparent;
+  }
+  .btn.primary { background: var(--cyan); color: #04222e; border-color: var(--cyan); font-weight: 600; }
+  .btn.primary:hover { box-shadow: 0 0 26px var(--cyan-glow); }
+  .btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .btn.primary:hover { color: #04222e; }
+
+  .hero-meta { display: flex; gap: 26px; margin-top: 36px; flex-wrap: wrap; }
+  .hero-meta .m b { font-family: var(--mono); font-size: 26px; font-weight: 600; color: var(--ink); display: block; }
+  .hero-meta .m span { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+
+  /* live feed panel in hero */
+  .feed { display: flex; flex-direction: column; min-height: 380px; }
+  .feed-head {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim);
+  }
+  .feed-head .live { color: var(--green); display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .feed-body { flex: 1; overflow: hidden; padding: 8px 0; position: relative; }
+  .feed-row {
+    display: grid; grid-template-columns: 64px 70px 1fr auto; gap: 10px; align-items: center;
+    padding: 5px 14px; font-family: var(--mono); font-size: 11.5px;
+    border-bottom: 1px solid rgba(120,150,180,0.05);
+    animation: slidein 0.4s ease;
+  }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .feed-row .t { color: var(--ink-faint); font-size: 10px; }
+  .badge {
+    font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; text-align: center;
+    padding: 2px 0; border: 1px solid; border-radius: 2px;
+  }
+  .b-event  { color: var(--cyan);  border-color: rgba(69,182,216,0.4); }
+  .b-mount  { color: var(--green); border-color: rgba(70,201,160,0.4); }
+  .b-params { color: var(--amber); border-color: rgba(224,165,88,0.4); }
+  .b-info   { color: var(--ink-dim); border-color: var(--line-2); }
+  .b-error  { color: var(--red);   border-color: rgba(224,96,93,0.5); background: rgba(224,96,93,0.08); }
+  .feed-row .name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed-row .name small { color: var(--ink-faint); }
+  .feed-row .dur { font-size: 10.5px; }
+  .dur.fast { color: var(--green); } .dur.mid { color: var(--amber); } .dur.slow { color: var(--red); }
+  .feed-foot {
+    padding: 8px 14px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em;
+  }
+
+  /* ---- Pitch strip ---- */
+  .strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); }
+  .strip .cell { padding: 26px 24px; border-right: 1px solid var(--line); }
+  .strip .cell:last-child { border-right: 0; }
+  .strip .cell .n { font-family: var(--mono); font-size: 11px; color: var(--cyan); letter-spacing: 0.12em; }
+  .strip .cell h3 { font-size: 16px; margin: 12px 0 8px; font-weight: 600; }
+  .strip .cell p { color: var(--ink-dim); font-size: 13.5px; margin: 0; line-height: 1.6; }
+
+  /* ---- Capability modules ---- */
+  .mods { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .mod {
+    padding: 20px 18px; position: relative; cursor: default;
+    transition: 0.18s; overflow: hidden;
+  }
+  .mod:hover { border-color: var(--line-2); background: var(--panel-2); transform: translateY(-2px); }
+  .mod .ico { font-size: 18px; margin-bottom: 12px; filter: grayscale(0.2); }
+  .mod h4 { font-size: 14px; margin: 0 0 7px; font-weight: 600; letter-spacing: -0.01em; }
+  .mod p { font-size: 12.5px; color: var(--ink-dim); margin: 0; line-height: 1.55; }
+  .mod .id { position: absolute; top: 12px; right: 14px; font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); letter-spacing: 0.1em; }
+
+  /* ---- Terminal demo ---- */
+  .term-wrap { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 24px; align-items: start; }
+  .scenarios { display: flex; flex-direction: column; gap: 10px; }
+  .scn {
+    text-align: left; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line);
+    cursor: pointer; transition: 0.16s; color: var(--ink); font-family: var(--sans); position: relative;
+  }
+  .scn:hover { border-color: var(--line-2); }
+  .scn.active { border-color: var(--cyan); background: rgba(69,182,216,0.06); }
+  .scn.active::before { content: ""; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 2px; background: var(--cyan); box-shadow: 0 0 12px var(--cyan-glow); }
+  .scn .scn-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cyan); }
+  .scn .scn-q { font-size: 13.5px; margin-top: 7px; color: var(--ink); line-height: 1.5; }
+
+  .term { font-family: var(--mono); font-size: 12.5px; min-height: 360px; display: flex; flex-direction: column; }
+  .term-head {
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--line);
+    color: var(--ink-dim); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .term-head .lights { display: flex; gap: 5px; }
+  .term-head .lights i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); }
+  .term-body { padding: 16px 16px; flex: 1; overflow: hidden; line-height: 1.7; }
+  .tl { margin: 2px 0; white-space: pre-wrap; word-break: break-word; }
+  .tl .pmt { color: var(--cyan); }
+  .tl .usr { color: var(--ink); }
+  .tl .call { color: var(--amber); }
+  .tl .arg { color: var(--ink-dim); }
+  .tl .res { color: var(--green); }
+  .tl .cmt { color: var(--ink-faint); }
+  .tl .key { color: var(--cyan); }
+  .cursor { display: inline-block; width: 8px; height: 14px; background: var(--cyan); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---- Ops / control rail ---- */
+  .ops { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .op { padding: 22px 20px; }
+  .op .h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .op .h .pill { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 7px; border: 1px solid var(--line-2); color: var(--amber); }
+  .op .h .pill.safe { color: var(--green); }
+  .op h4 { font-size: 15px; margin: 0; font-weight: 600; }
+  .op p { color: var(--ink-dim); font-size: 13px; margin: 0 0 12px; line-height: 1.6; }
+  .op ul { margin: 0; padding: 0; list-style: none; }
+  .op li { font-family: var(--mono); font-size: 11.5px; color: var(--ink); padding: 4px 0; display: flex; gap: 8px; }
+  .op li::before { content: "▸"; color: var(--cyan); }
+
+  /* ---- Install ---- */
+  .install { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+  .step .num { font-family: var(--mono); font-size: 11px; color: var(--cyan); letter-spacing: 0.1em; }
+  .step h4 { font-size: 14px; margin: 8px 0 10px; font-weight: 600; }
+  .code {
+    background: #050810; border: 1px solid var(--line); padding: 14px 16px;
+    font-family: var(--mono); font-size: 12px; color: var(--ink); overflow-x: auto;
+    line-height: 1.7;
+  }
+  .code .c-key { color: var(--cyan); } .code .c-str { color: var(--green); } .code .c-cmt { color: var(--ink-faint); }
+  .code .c-fn { color: var(--amber); }
+
+  /* ---- Footer ---- */
+  footer { border-top: 1px solid var(--line); padding: 40px 0 60px; margin-top: 30px; }
+  .foot-in { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .foot-in .tag { flex: 1; }
+  .foot-in a { color: var(--cyan); text-decoration: none; font-family: var(--mono); font-size: 12px; }
+  .foot-in a:hover { text-shadow: 0 0 14px var(--cyan-glow); }
+
+  .warn-note {
+    margin-top: 18px; padding: 12px 16px; border: 1px solid rgba(224,165,88,0.3);
+    background: rgba(224,165,88,0.05); font-family: var(--mono); font-size: 11.5px;
+    color: var(--amber); letter-spacing: 0.02em;
+  }
+
+  /* reveal on scroll */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 920px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .mods { grid-template-columns: repeat(2, 1fr); }
+    .term-wrap { grid-template-columns: 1fr; }
+    .ops, .install, .strip { grid-template-columns: 1fr; }
+    .strip .cell { border-right: 0; border-bottom: 1px solid var(--line); }
+    .strip .cell:last-child { border-bottom: 0; }
+    .top-stat.hide-sm { display: none; }
+  }
+  @media (max-width: 560px) {
+    .mods { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 38px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="grid-canvas"></canvas>
+<div class="vignette"></div>
+<div class="scanline"></div>
+
+<!-- BOOT -->
+<div id="boot">
+  <div class="boot-inner">
+    <div class="boot-title">LiveAgent // Runtime Link</div>
+    <div class="boot-log" id="boot-log"></div>
+    <div class="boot-bar"><i id="boot-bar"></i></div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="bolt">⚡</div>
+      <b>LIVE<span>_</span>AGENT</b>
+    </div>
+    <div class="top-stat hide-sm"><span class="dot"></span> MCP LINK · ESTABLISHED</div>
+    <div class="sep"></div>
+    <div class="top-stat hide-sm" id="clock">--:--:-- UTC</div>
+    <a class="top-cta" href="https://github.com/sunprema/live_agent" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-eyebrow"><span class="ln"></span> Model Context Protocol · Phoenix LiveView</div>
+        <h1>Give Claude Code<br><em>live eyes</em> on your<br>running app.</h1>
+        <p class="lead">
+          LiveAgent is an MCP server that exposes a Phoenix LiveView app's
+          <b>socket assigns, component tree, telemetry, and browser DOM</b> to AI
+          coding tools — in real time, from the running BEAM. Think
+          <b>live_debugger</b>, but as an instrument panel Claude can read <em>and</em> drive.
+        </p>
+        <div class="hero-cta">
+          <a class="btn primary" href="#install">Deploy in 3 steps ↘</a>
+          <a class="btn" href="#capabilities">Capabilities</a>
+        </div>
+        <div class="hero-meta">
+          <div class="m"><b>40+</b><span>MCP Tools</span></div>
+          <div class="m"><b>8</b><span>Live Panels</span></div>
+          <div class="m"><b>0</b><span>Code Instrumentation</span></div>
+          <div class="m"><b>dev</b><span>Only · Localhost</span></div>
+        </div>
+      </div>
+
+      <!-- Live telemetry feed -->
+      <div class="panel feed">
+        <div class="feed-head">
+          ◐ Telemetry Feed · /live_agent
+          <span class="live"><span class="dot"></span> LIVE</span>
+        </div>
+        <div class="feed-body" id="feed"></div>
+        <div class="feed-foot" id="feed-foot">RING BUFFER · 200 EVENTS · NO INSTRUMENTATION</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PITCH STRIP -->
+  <section class="reveal" style="padding-top:24px">
+    <div class="strip">
+      <div class="cell">
+        <div class="n">// 01 · READ</div>
+        <h3>See the live state</h3>
+        <p>Read assigns, scope, async tasks, and the component tree straight from the running process — no source-grepping, no guessing.</p>
+      </div>
+      <div class="cell">
+        <div class="n">// 02 · DRIVE</div>
+        <h3>Operate the app</h3>
+        <p>Click, fill, submit, and navigate through the real DOM. <code>phx-click</code>, JS hooks, and HTML5 validation all fire exactly as for a human.</p>
+      </div>
+      <div class="cell">
+        <div class="n">// 03 · VERIFY</div>
+        <h3>Prove the change</h3>
+        <p>Assertions, state diffs, screenshot regression, and named snapshots that survive code reloads. Pass/fail, not eyeballing.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAPABILITIES -->
+  <section id="capabilities">
+    <div class="sec-head reveal">
+      <span class="idx">[ MODULES ]</span>
+      <h2>Instrument panel</h2>
+      <span class="rule"></span>
+    </div>
+    <div class="mods">
+      <div class="panel mod reveal"><span class="id">M-01</span><div class="ico">📡</div><h4>LiveViews</h4><p>Every active LiveView process — PID, module, assigns. The connected root is marked and sorted first.</p></div>
+      <div class="panel mod reveal"><span class="id">M-02</span><div class="ico">🎯</div><h4>Element Picker</h4><p>Click any node; LiveAgent resolves its LiveComponent module, id, and assigns from the BEAM. Pin many for context.</p></div>
+      <div class="panel mod reveal"><span class="id">M-03</span><div class="ico">📊</div><h4>Events</h4><p>Color-coded telemetry log of <code>handle_event</code>, <code>mount</code>, <code>handle_params</code>, <code>handle_info</code> — with durations.</p></div>
+      <div class="panel mod reveal"><span class="id">M-04</span><div class="ico">🕓</div><h4>Timeline</h4><p>Ordered assigns transitions per LiveView. Trigger, diff counts, full before/after — answers "why did X change?".</p></div>
+      <div class="panel mod reveal"><span class="id">M-05</span><div class="ico">⏳</div><h4>Async</h4><p>In-flight <code>start_async</code> / <code>assign_async</code> with live elapsed time, plus a completion history.</p></div>
+      <div class="panel mod reveal"><span class="id">M-06</span><div class="ico">🗂️</div><h4>Ash Resources</h4><p>Every resource — attributes, actions, relationships — plus an auto-generated Mermaid class/ER diagram.</p></div>
+      <div class="panel mod reveal"><span class="id">M-07</span><div class="ico">📷</div><h4>Screenshots</h4><p>Capture, clip to one element, and diff against named baselines — real pixel comparison, AA-aware.</p></div>
+      <div class="panel mod reveal"><span class="id">M-08</span><div class="ico">📌</div><h4>Context Pins</h4><p>Pin source &amp; target elements with notes for Claude. Delivered together via <code>get_pinned_context</code>.</p></div>
+    </div>
+  </section>
+
+  <!-- TERMINAL DEMO -->
+  <section>
+    <div class="sec-head reveal">
+      <span class="idx">[ SESSION ]</span>
+      <h2>What a request looks like</h2>
+      <span class="rule"></span>
+    </div>
+    <div class="term-wrap reveal">
+      <div class="scenarios" id="scenarios"></div>
+      <div class="panel term">
+        <div class="term-head">
+          <div class="lights"><i></i><i></i><i></i></div>
+          claude-code · live-agent/mcp
+        </div>
+        <div class="term-body" id="term"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPS / CONTROL -->
+  <section>
+    <div class="sec-head reveal">
+      <span class="idx">[ CONTROL ]</span>
+      <h2>Hands-on the browser</h2>
+      <span class="rule"></span>
+    </div>
+    <div class="ops">
+      <div class="panel op reveal">
+        <div class="h"><span class="pill">DRIVE</span><h4>Agent controls</h4></div>
+        <p>With the <b>Drive</b> toggle on, Claude operates the real DOM. Every action returns the URL, flash, and a server-side assigns diff.</p>
+        <ul><li>click</li><li>fill</li><li>submit</li><li>navigate</li><li>wait_for</li><li>highlight_element</li></ul>
+      </div>
+      <div class="panel op reveal">
+        <div class="h"><span class="pill">DEV-ONLY</span><h4>act_as · impersonation</h4></div>
+        <p>One call lands the session authenticated as any user — built for testing multi-tenant org isolation. Four independent locks; none compile in prod.</p>
+        <ul><li>build gate (only: :dev)</li><li>env gate (:dev/:test)</li><li>app-supplied closure</li><li>Drive toggle</li></ul>
+      </div>
+      <div class="panel op reveal">
+        <div class="h"><span class="pill safe">VERIFY</span><h4>Assertions &amp; diffs</h4></div>
+        <p>Turn "read the state and judge it" into an explicit verdict — and a real anchor for verify loops.</p>
+        <ul><li>expect_assign</li><li>expect_no_errors</li><li>screenshot_diff</li><li>scratchpad_compare</li></ul>
+      </div>
+    </div>
+    <div class="warn-note reveal">⚠ SECURITY POSTURE — LiveAgent is dev-only and localhost-guarded. It returns 403 to any non-127.0.0.1 request and must never be mounted on a production endpoint.</div>
+  </section>
+
+  <!-- INSTALL -->
+  <section id="install">
+    <div class="sec-head reveal">
+      <span class="idx">[ DEPLOY ]</span>
+      <h2>Three steps to link</h2>
+      <span class="rule"></span>
+    </div>
+    <div class="install">
+      <div class="panel op step reveal">
+        <div class="num">// STEP 01</div>
+        <h4>Add the dep</h4>
+        <div class="code"><span class="c-cmt"># mix.exs</span>
+{<span class="c-key">:live_agent</span>, <span class="c-str">"~> 0.2"</span>,
+  only: <span class="c-key">:dev</span>}</div>
+      </div>
+      <div class="panel op step reveal">
+        <div class="num">// STEP 02</div>
+        <h4>Plug the endpoint</h4>
+        <div class="code"><span class="c-cmt"># endpoint.ex</span>
+<span class="c-fn">if</span> Code.ensure_loaded?(
+   LiveAgent) <span class="c-fn">do</span>
+  plug <span class="c-key">LiveAgent</span>
+<span class="c-fn">end</span></div>
+      </div>
+      <div class="panel op step reveal">
+        <div class="num">// STEP 03</div>
+        <h4>Point Claude at it</h4>
+        <div class="code"><span class="c-cmt">// .mcp.json</span>
+<span class="c-str">"live-agent"</span>: {
+ <span class="c-str">"type"</span>: <span class="c-str">"http"</span>,
+ <span class="c-str">"url"</span>: <span class="c-str">"…/live_agent/mcp"</span>
+}</div>
+      </div>
+    </div>
+    <p class="tag reveal" style="margin-top:6px">RUN <span class="accent">mix phx.server</span> — CLAUDE CODE CONNECTS OVER HTTP WHILE YOUR APP IS RUNNING. NO SEPARATE PROCESS.</p>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap foot-in">
+    <span class="tag">LIVE_AGENT · MCP SERVER FOR PHOENIX LIVEVIEW · MIT LICENSE</span>
+    <a href="https://github.com/sunprema/live_agent" target="_blank" rel="noopener">github.com/sunprema/live_agent ↗</a>
+  </div>
+</footer>
+
+<script>
+/* ---------- Background grid + drifting nodes ---------- */
+(function(){
+  const c = document.getElementById('grid-canvas');
+  const ctx = c.getContext('2d');
+  let w, h, dpr;
+  const nodes = [];
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = c.width = innerWidth * dpr; h = c.height = innerHeight * dpr;
+    c.style.width = innerWidth+'px'; c.style.height = innerHeight+'px';
+  }
+  resize(); addEventListener('resize', resize);
+  const N = 46;
+  for (let i=0;i<N;i++) nodes.push({ x: Math.random(), y: Math.random(), vx:(Math.random()-.5)*0.0004, vy:(Math.random()-.5)*0.0004 });
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    // grid
+    const step = 46*dpr;
+    ctx.strokeStyle = 'rgba(120,150,180,0.045)'; ctx.lineWidth = 1;
+    for (let x=0;x<w;x+=step){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+    for (let y=0;y<h;y+=step){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+    // nodes + links
+    for (const n of nodes){ n.x+=n.vx; n.y+=n.vy; if(n.x<0||n.x>1)n.vx*=-1; if(n.y<0||n.y>1)n.vy*=-1; }
+    for (let i=0;i<N;i++){
+      for (let j=i+1;j<N;j++){
+        const a=nodes[i], b=nodes[j];
+        const dx=(a.x-b.x)*w, dy=(a.y-b.y)*h, d=Math.hypot(dx,dy);
+        if (d < 150*dpr){
+          ctx.strokeStyle = 'rgba(69,182,216,'+(0.10*(1-d/(150*dpr)))+')';
+          ctx.beginPath(); ctx.moveTo(a.x*w,a.y*h); ctx.lineTo(b.x*w,b.y*h); ctx.stroke();
+        }
+      }
+    }
+    for (const n of nodes){
+      ctx.fillStyle = 'rgba(69,182,216,0.5)';
+      ctx.beginPath(); ctx.arc(n.x*w, n.y*h, 1.3*dpr, 0, 6.28); ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ---------- Clock ---------- */
+(function(){
+  const el = document.getElementById('clock');
+  function tick(){ el.textContent = new Date().toISOString().slice(11,19) + ' UTC'; }
+  tick(); setInterval(tick, 1000);
+})();
+
+/* ---------- Boot sequence ---------- */
+(function(){
+  const log = document.getElementById('boot-log');
+  const bar = document.getElementById('boot-bar');
+  const lines = [
+    ['scan beam processes', 'Phoenix.LiveView.Channel × 3'],
+    ['mount mcp server', '/live_agent/mcp'],
+    ['subscribe telemetry', 'handle_event · mount · params'],
+    ['attach browser bridge', 'panel · drive · screenshot'],
+    ['register tools', '40 tools online'],
+  ];
+  let i = 0;
+  function next(){
+    if (i >= lines.length){ bar.style.width='100%'; setTimeout(()=>document.getElementById('boot').classList.add('done'), 360); return; }
+    const [a,b] = lines[i];
+    const d = document.createElement('div');
+    d.className = 'boot-line';
+    d.innerHTML = '<span class="ok">▸</span> '+a+' … <span class="ok">[ '+b+' ]</span>';
+    log.appendChild(d);
+    requestAnimationFrame(()=> d.style.transition='opacity .25s', d.style.opacity=1);
+    d.style.opacity = 1;
+    i++; bar.style.width = (i/lines.length*100)+'%';
+    setTimeout(next, 300);
+  }
+  setTimeout(next, 350);
+})();
+
+/* ---------- Live telemetry feed ---------- */
+(function(){
+  const feed = document.getElementById('feed');
+  const foot = document.getElementById('feed-foot');
+  const views = ['DashboardLive','CartLive','UserSettingsLive','PatientLive','CheckoutLive','InboxLive','OrgAdminLive'];
+  const events = [
+    ['event','b-event','add_to_cart','cart += 1 item'],
+    ['event','b-event','toggle_filter','filters changed'],
+    ['mount','b-mount','—','3 added · 0 removed'],
+    ['params','b-params','handle_params','?tab=settings'],
+    ['event','b-event','validate','form revalidated'],
+    ['info','b-info','pubsub:presence','2 changed'],
+    ['event','b-event','submit_payment','status → settled'],
+    ['params','b-params','handle_params','/patients/4f2a'],
+    ['event','b-event','select_row','selection += 1'],
+    ['error','b-error','save_form','** (KeyError) :email'],
+    ['event','b-event','apply_coupon','cart.total → 41.20'],
+    ['mount','b-mount','—','assign_async :stats'],
+  ];
+  let rows = [];
+  function rand(a){ return a[Math.floor(Math.random()*a.length)]; }
+  function add(){
+    const [type, cls, name, detail] = rand(events);
+    const view = rand(views);
+    const ms = type==='error' ? (120+Math.random()*180) : (Math.random()<0.6 ? Math.random()*9 : 9+Math.random()*110);
+    const durcls = ms<10?'fast':ms<100?'mid':'slow';
+    const now = new Date().toISOString().slice(11,19);
+    const r = document.createElement('div');
+    r.className = 'feed-row';
+    r.innerHTML =
+      '<span class="t">'+now+'</span>'+
+      '<span class="badge '+cls+'">'+type+'</span>'+
+      '<span class="name">'+name+' <small>· '+view+'</small><br><small>'+detail+'</small></span>'+
+      '<span class="dur '+durcls+'">'+ms.toFixed(1)+'ms</span>';
+    feed.prepend(r);
+    rows.push(r);
+    if (rows.length > 7){ const old = rows.shift(); old.remove(); }
+    foot.textContent = 'RING BUFFER · '+(140+Math.floor(Math.random()*60))+'/200 EVENTS · NO INSTRUMENTATION';
+  }
+  for (let k=0;k<5;k++) setTimeout(add, k*120);
+  setInterval(add, 1700);
+})();
+
+/* ---------- Terminal scenarios ---------- */
+(function(){
+  const scenarios = [
+    {
+      tag: 'INSPECT · ASSIGNS',
+      q: '"What data is driving the cart on screen right now?"',
+      script: [
+        ['pmt','› '], ['usr','What data is driving the cart on screen right now?'],
+        ['call','\n→ list_live_views()'],
+        ['res','  ✓ CartLive  #PID<0.842.0>  ← connected root'],
+        ['call','→ get_assigns('], ['arg','pid: "<0.842.0>"'], ['call',')'],
+        ['res','  ✓ cart: %{items: 3, total: 58.40, coupon: nil}'],
+        ['res','  ✓ user: #1042  ·  loading?: false'],
+        ['cmt','  Last change: handle_event "add_to_cart" (+1 item)'],
+      ]
+    },
+    {
+      tag: 'DRIVE · OPERATE',
+      q: '"Add the blue t-shirt to the cart and tell me what changed."',
+      script: [
+        ['pmt','› '], ['usr','Add the blue t-shirt and tell me what changed.'],
+        ['call','\n→ get_component_tree()'],
+        ['res','  ✓ found [phx-click="add_to_cart"][data-id="42"]'],
+        ['call','→ click('], ['arg','selector: "[data-id=\'42\']"'], ['call',')   '], ['cmt','# Drive ON'],
+        ['res','  ✓ flash: "Added Blue Tee"'],
+        ['res','  ✓ diff → cart.items 3→4 · total 58.40→72.40'],
+      ]
+    },
+    {
+      tag: 'ISOLATION · act_as',
+      q: '"Can an org-B admin see org-A\'s patient record?"',
+      script: [
+        ['pmt','› '], ['usr','Can an org-B admin see org-A\'s patient?'],
+        ['call','\n→ act_as('], ['arg','"orgb-admin@example.com"'], ['call',')'],
+        ['res','  ✓ scope → actor #88 · tenant: org_B'],
+        ['call','→ navigate('], ['arg','"/patients/<orgA-id>"'], ['call',')'],
+        ['res','  ✓ status: 404 — record not visible'],
+        ['cmt','  Isolation holds. Re-running as org-A admin…'],
+        ['res','  ✓ status: 200 — record renders. ✔'],
+      ]
+    },
+    {
+      tag: 'VERIFY · REGRESSION',
+      q: '"Did my CSS change touch only the cart card?"',
+      script: [
+        ['pmt','› '], ['usr','Did that CSS change touch only the cart card?'],
+        ['call','\n→ screenshot_diff('], ['arg','name: "cart", selector: ".cart"'], ['call',')'],
+        ['res','  ✓ changed_ratio: 0.037   dims_match?: true'],
+        ['res','  ✓ changed_boxes: [{x:12,y:80,w:220,h:64}]'],
+        ['res','  ✓ overlay → screenshots/diffs/cart.png'],
+        ['cmt','  Change stayed inside the card. Nothing else moved.'],
+      ]
+    },
+  ];
+
+  const list = document.getElementById('scenarios');
+  const term = document.getElementById('term');
+  let active = -1, typer = null;
+
+  scenarios.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'scn';
+    b.innerHTML = '<div class="scn-tag">'+s.tag+'</div><div class="scn-q">'+s.q+'</div>';
+    b.onclick = () => run(i);
+    list.appendChild(b);
+  });
+
+  function run(i){
+    if (typer) clearTimeout(typer);
+    active = i;
+    [...list.children].forEach((c,k)=>c.classList.toggle('active', k===i));
+    term.innerHTML = '';
+    const seq = scenarios[i].script;
+    let li = 0, lineEl = null;
+    function step(){
+      if (li >= seq.length){
+        const cur = document.createElement('span'); cur.className='cursor';
+        if (lineEl) lineEl.appendChild(cur);
+        return;
+      }
+      const [cls, txt] = seq[li];
+      if (txt.startsWith('\n') || cls==='pmt'){
+        lineEl = document.createElement('div'); lineEl.className='tl';
+        term.appendChild(lineEl);
+      }
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = txt.replace(/^\n/,'');
+      lineEl.appendChild(span);
+      li++;
+      typer = setTimeout(step, 230 + Math.random()*120);
+    }
+    step();
+  }
+
+  // auto-start first scenario when section scrolls in
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting && active===-1){ run(0); io.disconnect(); } });
+  }, {threshold: 0.3});
+  io.observe(term);
+})();
+
+/* ---------- Reveal on scroll ---------- */
+(function(){
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold: 0.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+})();
+</script>
+</body>
+</html>
