@@ -458,6 +458,7 @@ scene.add(points);
 
 // ── synaptic connections: link near neighbours ──
 const linePos = [];
+const edges = [];                  // keep endpoint pairs so signals can travel them
 for (let i = 0; i < COUNT; i += 2) {
   let best = -1, bestD = 6.5;   // only connect reasonably close points
   for (let j = i + 1; j < Math.min(i + 60, COUNT); j++) {
@@ -466,11 +467,12 @@ for (let i = 0; i < COUNT; i += 2) {
   }
   if (best >= 0) {
     linePos.push(pts[i].x, pts[i].y, pts[i].z, pts[best].x, pts[best].y, pts[best].z);
+    edges.push([pts[i], pts[best]]);
   }
 }
 const lgeo = new THREE.BufferGeometry();
 lgeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(linePos), 3));
-const lmat = new THREE.LineBasicMaterial({ color: 0x7d7ab0, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending });
+const lmat = new THREE.LineBasicMaterial({ color: 0x8c88c4, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending });
 const lines = new THREE.LineSegments(lgeo, lmat);
 scene.add(lines);
 
@@ -478,6 +480,30 @@ const group = new THREE.Group();
 group.add(points); group.add(lines);
 scene.remove(points); scene.remove(lines);
 scene.add(group);
+
+// ── firing signals: bright sprites that travel along the synapses ──
+const SIG = Math.min(110, edges.length);
+const sigPos = new Float32Array(SIG * 3);
+const sigCol = new Float32Array(SIG * 3);
+const sig = [];
+for (let i = 0; i < SIG; i++) {
+  sig.push({
+    e: edges[(Math.random() * edges.length) | 0],
+    t: Math.random(),
+    spd: 0.5 + Math.random() * 1.1,            // travel speed along the edge
+    col: palette[(Math.random() * palette.length) | 0]
+  });
+}
+const sgeo = new THREE.BufferGeometry();
+sgeo.setAttribute('position', new THREE.BufferAttribute(sigPos, 3));
+sgeo.setAttribute('color', new THREE.BufferAttribute(sigCol, 3));
+const smat = new THREE.PointsMaterial({
+  size: 1.15, map: sprite, vertexColors: true, transparent: true,
+  depthWrite: false, blending: THREE.AdditiveBlending, opacity: 1
+});
+const signals = new THREE.Points(sgeo, smat);
+group.add(signals);
+const sigTmp = new THREE.Vector3();
 
 // pointer parallax
 let px = 0, py = 0, tx = 0, ty = 0;
@@ -495,9 +521,11 @@ window.addEventListener('resize', resize); resize();
 
 const colAttr = geo.attributes.color;
 const clock = new THREE.Clock();
+let lastT = 0;
 
 function tick() {
   const t = clock.getElapsedTime();
+  const dt = Math.min(0.05, t - lastT); lastT = t;
   // gentle autonomous rotation + pointer parallax = a slowly turning, breathing brain
   px += (tx - px) * 0.04; py += (ty - py) * 0.04;
   group.rotation.y = t * 0.06 + px * 0.7;
@@ -515,7 +543,25 @@ function tick() {
     colAttr.array[i*3+2] = baseColor.b * fire;
   }
   colAttr.needsUpdate = true;
-  lmat.opacity = 0.10 + Math.sin(t * 0.5) * 0.04;
+  lmat.opacity = 0.14 + Math.sin(t * 0.5) * 0.04;
+
+  // signals racing along the synapses — brightest mid-travel
+  for (let i = 0; i < SIG; i++) {
+    const s = sig[i];
+    s.t += s.spd * dt;
+    if (s.t >= 1) {                       // reached the far neuron — fire a new one
+      s.t = 0;
+      s.e = edges[(Math.random() * edges.length) | 0];
+      s.col = palette[(Math.random() * palette.length) | 0];
+    }
+    sigTmp.copy(s.e[0]).lerp(s.e[1], s.t);
+    sigPos[i*3] = sigTmp.x; sigPos[i*3+1] = sigTmp.y; sigPos[i*3+2] = sigTmp.z;
+    const b = Math.sin(s.t * Math.PI);    // 0 at endpoints, 1 in the middle
+    baseColor.setHex(s.col);
+    sigCol[i*3] = baseColor.r * b; sigCol[i*3+1] = baseColor.g * b; sigCol[i*3+2] = baseColor.b * b;
+  }
+  sgeo.attributes.position.needsUpdate = true;
+  sgeo.attributes.color.needsUpdate = true;
 
   renderer.render(scene, camera);
   if (!reduce) requestAnimationFrame(tick);
